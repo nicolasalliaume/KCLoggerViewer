@@ -9,7 +9,8 @@
 		
 		var $body, 
 			_data, 
-			_filters = {};
+			_filters = {},
+			_url = 'http://app.konacloud.io/api/diego/KCLog/mr_Logs';  // ///// HERE /////: Replace this URL with your own  
 
 		$(document).ready(function(){
 			$body = $('body');
@@ -17,7 +18,7 @@
 		});
 		function fetchData() {
 			$.ajax({
-				url: 'http://app.konacloud.io/api/diego/KCLog/mr_Logs',
+				url: _url,
 				type: 'get',
 				dataType: 'json',
 				success: function(data){
