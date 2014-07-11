@@ -1,0 +1,313 @@
+<html>
+<head>
+	<title>Viewer - KonaCloud Logger</title>
+
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+	<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.6.0/underscore-min.js"></script>
+	<!--script src="jquery.modal.min.js" type="text/javascript" charset="utf-8"></script-->
+	<script type="text/javascript">
+		
+		var $body, 
+			_data, 
+			_filters = {};
+
+		$(document).ready(function(){
+			$body = $('body');
+			fetchData();
+		});
+		function fetchData() {
+			$.ajax({
+				url: 'http://app.konacloud.io/api/diego/KCLog/mr_Logs',
+				type: 'get',
+				dataType: 'json',
+				success: function(data){
+					appendData(data.data);
+					_data = data.data;
+					setupExpansion();
+					setupOptions(data.data)
+				},
+				error: function(){
+					$body.append('Error!');
+				}
+			});
+		};
+		function setupModal() {
+			// setups a div to be used as a modal
+			// window when a log record is clicked
+			$('body').append('<div class="modal"></div>');
+			$('a').click(function(){
+				// show the log record content on the
+				// modal window
+				$('.modal').html($(this).find('span').html()).modal();
+			});
+		};
+		function setupExpansion() {
+			$('a').click(function(){
+				// expand this log record to show 
+				// the complete text
+				$(this).find('span').toggleClass('opened');
+			});
+		};
+		function setupOptions(jsonArray) {
+			// add property filters. Any property
+			// can be added!
+			['Category', 'Level'].forEach(function(p) {
+				// build the actual div of options to
+				// apply the filter
+				optionsForPropery(p, jsonArray);
+				// attach the header to the action of
+				// showing the filter options
+				$('.headers span[rel="options:'+p+'"]').click(function(e) {
+					e.stopImmediatePropagation();
+					$('div.options').fadeOut();
+					$('div.options.'+p+'-options').fadeIn().click(function(e){
+						e.stopImmediatePropagation();
+						$(this).fadeOut().unbind();
+					});
+				});
+			});
+			$('body')
+				.click(function(){
+					$('div.options').fadeOut(); 
+				})
+				.keyup(function(e){
+					console.log(e);
+					if (e.keyCode === 27) {
+						removeFilters();
+					}
+				});
+		};
+		function optionsForPropery(propName, jsonArray) {
+			// setups filtering options for the
+			// given property, using the unique
+			// values of that property as filters.
+			// a div element called <propName>-options
+			// must exist already in the dom
+			var _opts = _.uniq(_.map(jsonArray, _.property(propName)));
+			$('.'+propName+'-options').html(list(buildListElements(propName, _opts)));
+		};
+		function buildListElements(propName, values) {
+			// returns a string of <li/> elements,
+			// one for each value in the given array.
+			// also, each li element is attached to
+			// a filtering event
+			return _.reduce(_.map(values, function(v){
+				var label = v !== '' ? v : '&lt;EMPTY&gt;';
+				return '<li onclick="filter(\''+propName+'\', \''+v+'\');">'+label+'</li>';
+			}), function(a,b){
+				return a + b;
+			});
+		};
+		function filter(propName, value) {
+			// filters all log records based on the
+			// given property name, with the given
+			// value.
+			// filters are accumulated, so this new
+			// filter is added on top of the filter's
+			// stack
+			_filters[propName] = value;
+			var data = filterChain(_.pairs(_filters), _data);
+			wipe();
+			appendData(data);
+			setupExpansion();
+		};
+		function filterChain(chain, data) {
+			// applies the first filter from the filter
+			// chain and recursively applies the others
+			// until no more filters exist on the chain.
+			//
+			// chain is an array in the following format:
+			//   [ [propName, value], ... ]
+			//
+			if (chain.length === 0)
+				return data;
+			
+			var filter = chain[0];
+			data = _.filter(data, function(i){
+				return _.property(filter[0])(i) === filter[1];
+			});
+			return filterChain(chain.slice(1), data);
+		}
+		function removeFilters() {
+			// removes all filters and reloads
+			// data
+			_filters = {};
+			wipe();
+			appendData(_data); // _data == all data
+			setupExpansion();
+		};
+		function wipe() {
+			// removes all log records from the DOM
+			$('body .record:not(.headers)').remove();
+		};
+		function appendData(jsonArray) {
+			// Appends all log records into the
+			// DOM (divs at body level)
+			if (jsonArray.length == 0) {
+				return;
+			}
+			// Append one log item and recursively
+			// add the others.
+			$body.append('<div class="record">'+formatRecord(jsonArray[0])+'</div>');
+			appendData(jsonArray.slice(1));
+		};
+		function formatRecord(record) {
+			// Formats one log item to be appended
+			// latter into the DOM.
+			//
+			// Item fields:
+			// 	- CreatedAt
+			// 	- Level
+			// 	= Category
+			// 	- Text
+			return span(record.Category || '-', 'category')
+					+ span(record.Level || '-', 'level '+classForLevel(record.Level))
+					+ span(record.CreatedAt, 'date')
+					+ modalLink(span(record.Text, 'text'), record.Text);
+		};
+		function classForLevel(level) {
+			// returns an appropiate class for
+			// the given log level
+			if (level === 'WARNING')
+				return 'warn';
+			if (level === 'DEGUG')
+				return 'debug';
+			if (level === 'INFO')
+				return 'info';
+			if (level === 'ERROR')
+				return 'error';
+			return '';
+		};
+		function span(html, cls, fontawesomeIcon) {
+			// Returns an HTML span element with
+			// the given class and HTML content
+			var _class = cls || '';
+			var fa = '';
+			if (fontawesomeIcon) {
+				fa = '<i class="fa fa-tag"></i>';
+			}
+			return '<span class="'+_class+'">'+fa+html+'</span>';
+		};
+		function modalLink(html, modalText) {
+			return '<a>'+html+'</a>';
+		};
+		function list(liElems) {
+			return '<ul>'+liElems+'</ul>';
+		};
+		function copyToClipboardButton() {
+			return '<div class="options"><button onclick="copyToClipboard();">Copy to Clipboard</button></div>';
+		};
+		function openOptions(rel) {
+			// opens the options panel, to filter 
+			// the items of the corresponding column
+			var _class = rel.split(':')[1] + '-options';
+			$('.options.'+_class).show();
+		};
+	</script>
+
+	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+	<link href='http://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700,900' rel='stylesheet' type='text/css'>
+	<link href='http://fonts.googleapis.com/css?family=Ubuntu+Mono' rel='stylesheet' type='text/css'>
+	<!--link rel="stylesheet" href="jquery.modal.css" type="text/css" media="screen" /-->
+	<style type="text/css">
+		body {
+			font-family: 'Ubuntu Mono', sans-serif;
+			font-size: 0.8em;
+		}
+		.record {
+			
+		}
+		.record {
+			clear: both;
+		}
+		.record span {
+			vertical-align: top;
+			margin-right: 15px;
+			display: inline-block;
+		}
+		.record {
+			background-color: #fff;
+		}
+		.record:hover {
+			background-color: #f5f5f5;
+		}
+		.category {
+			color: #777;
+			width: 100px;
+		}
+		.level {
+			color: #9933CC;
+			width: 70px;
+		}
+		.level.warn {
+			color: #FFCC00;
+			font-weight: 'medium';
+		}
+		.level.info,
+		.level.debug {
+			color: #66CC33;
+		}
+		.level.error {
+			color: #ff0000;
+		}
+		.date {
+			color: #777;
+			width: 160px;
+		}
+		.text {
+			color: #444;
+			max-width: 870px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			cursor: pointer;
+		}
+		.text.opened {
+			text-overflow: none;
+			white-space: normal;
+			color: #777;
+		}
+		.headers {
+			background-color: #ededed;
+		}
+		.record.headers:hover {
+			background-color: #ededed;
+		}
+		.headers .level,
+		.headers .category {
+			cursor: pointer;
+		}
+		.options {
+			display: none;
+			background-color: #ededed /*#2a2a2a*/;
+			padding: 10px;
+			position: absolute;
+		}
+		.options ul {
+			margin: 0;
+			padding: 0;
+		}
+		.options ul li {
+			list-style: none;
+		}
+	</style>
+</head>
+<body>
+	<div class="headers record">
+		<span class="category" rel="options:Category">
+			<i class="fa fa-tag"></i> Category
+			<div class="Category-options options"></div>
+		</span>
+		<span class="level" rel="options:Level">
+			<i class="fa fa-warning"></i> Level
+			<div class="Level-options options"></div>
+		</span>
+		<span class="date">
+			<i class="fa fa-calendar"></i> Date
+		</span>
+		<span class="text">
+			<i class="fa fa-bug"></i> Text
+		</span>
+	</div>
+</body>
+</html>
