@@ -7,13 +7,18 @@
 	<!--script src="jquery.modal.min.js" type="text/javascript" charset="utf-8"></script-->
 	<script type="text/javascript">
 		
-		var $body, 
+		var $records, 
 			_data, 
+			_pressedKeys = {},
 			_filters = {},
 			_url = 'http://app.konacloud.io/api/diego/KCLog/mr_Logs';  // ///// HERE /////: Replace this URL with your own  
 
+		var __SHIFT__ = 16,
+			__ESC__ = 27,
+			__M__ = 77;
+
 		$(document).ready(function(){
-			$body = $('body');
+			$records = $('.records');
 			fetchData();
 		});
 		function fetchData() {
@@ -32,21 +37,21 @@
 				}
 			});
 		};
-		function setupModal() {
-			// setups a div to be used as a modal
-			// window when a log record is clicked
-			$('body').append('<div class="modal"></div>');
-			$('a').click(function(){
-				// show the log record content on the
-				// modal window
-				$('.modal').html($(this).find('span').html()).modal();
-			});
-		};
+		// function setupModal() {
+		// 	// setups a div to be used as a modal
+		// 	// window when a log record is clicked
+		// 	$('body').append('<div class="modal"></div>');
+		// 	$('a').click(function(){
+		// 		// show the log record content on the
+		// 		// modal window
+		// 		$('.modal').html($(this).find('span').html()).modal();
+		// 	});
+		// };
 		function setupExpansion() {
-			$('a').click(function(){
+			$('.records span.text').click(function(){
 				// expand this log record to show 
 				// the complete text
-				$(this).find('span').toggleClass('opened');
+				$(this).toggleClass('opened');
 			});
 		};
 		function setupOptions(jsonArray) {
@@ -71,11 +76,18 @@
 				.click(function(){
 					$('div.options').fadeOut(); 
 				})
+				.keydown(function(e){
+					_pressedKeys[e.keyCode] = true;
+					if (_.contains(_.keys(_pressedKeys), String(__SHIFT__)) 
+						&& _.contains(_.keys(_pressedKeys), String(__M__))) {
+						switchMode();
+					}
+				})
 				.keyup(function(e){
-					console.log(e);
-					if (e.keyCode === 27) {
+					if (e.keyCode === __ESC__) {
 						removeFilters();
 					}
+					delete (_pressedKeys[e.keyCode]);
 				});
 		};
 		function optionsForPropery(propName, jsonArray) {
@@ -139,7 +151,7 @@
 		};
 		function wipe() {
 			// removes all log records from the DOM
-			$('body .record:not(.headers)').remove();
+			$('.records').children().remove();
 		};
 		function appendData(jsonArray) {
 			// Appends all log records into the
@@ -149,7 +161,7 @@
 			}
 			// Append one log item and recursively
 			// add the others.
-			$body.append('<div class="record">'+formatRecord(jsonArray[0])+'</div>');
+			$records.append('<div class="record">'+formatRecord(jsonArray[0])+'</div>');
 			appendData(jsonArray.slice(1));
 		};
 		function formatRecord(record) {
@@ -164,7 +176,7 @@
 			return span(record.Category || '-', 'category')
 					+ span(record.Level || '-', 'level '+classForLevel(record.Level))
 					+ span(record.CreatedAt, 'date')
-					+ modalLink(span(record.Text, 'text'), record.Text);
+					+ span(record.Text, 'text');
 		};
 		function classForLevel(level) {
 			// returns an appropiate class for
@@ -189,9 +201,9 @@
 			}
 			return '<span class="'+_class+'">'+fa+html+'</span>';
 		};
-		function modalLink(html, modalText) {
-			return '<a>'+html+'</a>';
-		};
+		// function modalLink(html, modalText) {
+		// 	return '<a>'+html+'</a>';
+		// };
 		function list(liElems) {
 			return '<ul>'+liElems+'</ul>';
 		};
@@ -204,6 +216,9 @@
 			var _class = rel.split(':')[1] + '-options';
 			$('.options.'+_class).show();
 		};
+		function switchMode() {
+			$('body').toggleClass('lightmode').toggleClass('darkmode');
+		}
 	</script>
 
 	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
@@ -215,22 +230,29 @@
 			font-family: 'Ubuntu Mono', sans-serif;
 			font-size: 0.8em;
 		}
-		.record {
-			
+		.records {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			display: table;
+			table-layout: fixed;
+			min-width: 490px;
 		}
 		.record {
 			clear: both;
+			display: table-row;
+			text-align: left;
 		}
 		.record span {
 			vertical-align: top;
-			margin-right: 15px;
-			display: inline-block;
+			display: table-cell;
+			text-align: left;
 		}
 		.record {
-			background-color: #fff;
+			/*background-color: #fff;*/
 		}
 		.record:hover {
-			background-color: #f5f5f5;
+			/*background-color: #f5f5f5;*/
 		}
 		.category {
 			color: #777;
@@ -257,7 +279,6 @@
 		}
 		.text {
 			color: #444;
-			max-width: 870px;
 			white-space: nowrap;
 			overflow: hidden;
 			text-overflow: ellipsis;
@@ -291,10 +312,38 @@
 		.options ul li {
 			list-style: none;
 		}
+		.headers > span {
+			display: inline-block;
+			margin-right: -6px;
+		}
+
+		/* //// Dark Mode //// */
+		body.darkmode,
+		body.darkmode .records div {
+			background-color: #222;
+			color: #eee;
+		}
+		body.darkmode .headers {
+			background-color: #666;
+		}
+		body.darkmode .headers span {
+			color: #fff;
+		}
+		body.darkmode .record .text {
+			color: #efefef;
+		}
+
+		/* //// Light Mode //// */
+		body.lightmode,
+		body.lightmode .records div {
+			background-color: #FFF;
+			color: #444;
+		}
+
 	</style>
 </head>
-<body>
-	<div class="headers record">
+<body class="lightmode">
+	<div class="headers">
 		<span class="category" rel="options:Category">
 			<i class="fa fa-tag"></i> Category
 			<div class="Category-options options"></div>
@@ -310,5 +359,6 @@
 			<i class="fa fa-bug"></i> Text
 		</span>
 	</div>
+	<div class='records'></div>
 </body>
 </html>
