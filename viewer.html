@@ -230,7 +230,7 @@
 			// appended at the top of the page. 
 			// active filters are applied
 			setTimeout(function(){
-				var from = _data[_data.length-1].CreatedAt;
+				var from = _data[_data.length-1]._id;
 				$.ajax({
 					url: urlFrom(from),
 					type: 'get',
