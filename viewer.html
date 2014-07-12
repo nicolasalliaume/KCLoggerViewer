@@ -4,13 +4,13 @@
 
 	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 	<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.6.0/underscore-min.js"></script>
-	<!--script src="jquery.modal.min.js" type="text/javascript" charset="utf-8"></script-->
 	<script type="text/javascript">
 		
 		var $records, 
 			_data, 
 			_pressedKeys = {},
 			_filters = {},
+			_refreshDelay = 5,
 			_url = 'http://app.konacloud.io/api/diego/KCLog/mr_Logs';  // ///// HERE /////: Replace this URL with your own  
 
 		var __SHIFT__ = 16,
@@ -30,56 +30,40 @@
 					appendData(data.data);
 					_data = data.data;
 					setupExpansion();
-					setupOptions(data.data)
+					setupOptions(_data);
+					setupKeys();
+					refreshLoop();
 				},
 				error: function(){
-					$body.append('Error!');
+					alert('An unexpected error has occurred');
 				}
 			});
 		};
-		// function setupModal() {
-		// 	// setups a div to be used as a modal
-		// 	// window when a log record is clicked
-		// 	$('body').append('<div class="modal"></div>');
-		// 	$('a').click(function(){
-		// 		// show the log record content on the
-		// 		// modal window
-		// 		$('.modal').html($(this).find('span').html()).modal();
-		// 	});
-		// };
 		function setupExpansion() {
-			$('.records span.text').click(function(){
+			$('.records span.text').unbind().click(function(){
 				// expand this log record to show 
-				// the complete text
-				$(this).toggleClass('opened');
+				// the complete text and compacts
+				// the previously opened one
+				$('.record.opened').removeClass('opened');
+				$(this).parent('.record').toggleClass('opened');
 			});
 		};
 		function setupOptions(jsonArray) {
 			// add property filters. Any property
 			// can be added!
 			['Category', 'Level'].forEach(function(p) {
-				// build the actual div of options to
-				// apply the filter
-				optionsForPropery(p, jsonArray);
-				// attach the header to the action of
-				// showing the filter options
-				$('.headers span[rel="options:'+p+'"]').click(function(e) {
-					e.stopImmediatePropagation();
-					$('div.options').fadeOut();
-					$('div.options.'+p+'-options').fadeIn().click(function(e){
-						e.stopImmediatePropagation();
-						$(this).fadeOut().unbind();
-					});
-				});
+				addFilterForProperty(p, jsonArray);
 			});
+		};
+		function setupKeys() {
+			// Key recognitions
 			$('body')
 				.click(function(){
 					$('div.options').fadeOut(); 
 				})
 				.keydown(function(e){
 					_pressedKeys[e.keyCode] = true;
-					if (_.contains(_.keys(_pressedKeys), String(__SHIFT__)) 
-						&& _.contains(_.keys(_pressedKeys), String(__M__))) {
+					if (isSwitchModeCombination()) {
 						switchMode();
 					}
 				})
@@ -89,6 +73,27 @@
 					}
 					delete (_pressedKeys[e.keyCode]);
 				});
+		};
+		function addFilterForProperty(p, jsonArray) {
+			// build the actual div of options to
+			// apply the filter
+			optionsForPropery(p, jsonArray);
+			// attach the header to the action of
+			// showing the filter options
+			$('.headers span[rel="options:'+p+'"]').unbind().click(function(e) {
+				e.stopImmediatePropagation();
+				$('div.options').fadeOut();
+				$('div.options.'+p+'-options').fadeIn().click(function(e){
+					e.stopImmediatePropagation();
+					$(this).fadeOut().unbind();
+				});
+			});
+		};
+		function isSwitchModeCombination() {
+			// Return True if the *switch mode* key
+			// combination is pressed
+			return _.contains(_.keys(_pressedKeys), String(__SHIFT__)) 
+						&& _.contains(_.keys(_pressedKeys), String(__M__));
 		};
 		function optionsForPropery(propName, jsonArray) {
 			// setups filtering options for the
@@ -155,13 +160,14 @@
 		};
 		function appendData(jsonArray) {
 			// Appends all log records into the
-			// DOM (divs at body level)
+			// DOM (divs at body level) in the reverse
+			// order
 			if (jsonArray.length == 0) {
 				return;
 			}
 			// Append one log item and recursively
-			// add the others.
-			$records.append('<div class="record">'+formatRecord(jsonArray[0])+'</div>');
+			// add the others previous ones
+			$records.prepend('<div class="record">'+formatRecord(jsonArray[0])+'</div>');
 			appendData(jsonArray.slice(1));
 		};
 		function formatRecord(record) {
@@ -219,12 +225,45 @@
 		function switchMode() {
 			$('body').toggleClass('lightmode').toggleClass('darkmode');
 		}
+		function refreshLoop() {
+			// polls for new log data. new data is 
+			// appended at the top of the page. 
+			// active filters are applied
+			setTimeout(function(){
+				var from = _data[_data.length-1].CreatedAt;
+				$.ajax({
+					url: urlFrom(from),
+					type: 'get',
+					dataType: 'json',
+					success: function(data) {
+						// appends the filtered new data at the 
+						// top of the DOM
+						appendData(filterChain(_.pairs(_filters), data.data));
+						// appends [all] new data to old data
+						_data = $.merge(_data, data.data);
+						// rebuild filtering options
+						setupExpansion();
+						setupOptions(_data);
+						// set timeout for next refresh
+						setTimeout(refreshLoop, seconds(_refreshDelay));
+					},
+					error: function(){
+						alert('An unexpected error has occurred');
+					}
+				});
+			}, seconds(_refreshDelay));
+		};
+		function urlFrom(from) {
+			return _url + '?from=' + from;
+		}
+		function seconds(s) {
+			return s * 1000;
+		}
 	</script>
 
 	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
 	<link href='http://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700,900' rel='stylesheet' type='text/css'>
 	<link href='http://fonts.googleapis.com/css?family=Ubuntu+Mono' rel='stylesheet' type='text/css'>
-	<!--link rel="stylesheet" href="jquery.modal.css" type="text/css" media="screen" /-->
 	<style type="text/css">
 		body {
 			font-family: 'Ubuntu Mono', sans-serif;
@@ -253,6 +292,12 @@
 		}
 		.record:hover {
 			/*background-color: #f5f5f5;*/
+		}
+		.record.opened {
+			background-color: #A93496 !important;
+		}
+		.record.opened span {
+			color: #FFF !important;
 		}
 		.category {
 			color: #777;
@@ -284,10 +329,9 @@
 			text-overflow: ellipsis;
 			cursor: pointer;
 		}
-		.text.opened {
+		.record.opened .text {
 			text-overflow: none;
 			white-space: normal;
-			color: #777;
 		}
 		.headers {
 			background-color: #ededed;
