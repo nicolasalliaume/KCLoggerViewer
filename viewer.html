@@ -10,7 +10,7 @@
 			_data, 
 			_pressedKeys = {},
 			_filters = {},
-			_refreshDelay = 5,
+			_refreshDelay = 2,
 			_url = 'http://app.konacloud.io/api/diego/KCLog/mr_Logs';  // ///// HERE /////: Replace this URL with your own  
 
 		var __SHIFT__ = 16,
@@ -22,6 +22,9 @@
 			fetchData();
 		});
 		function fetchData() {
+			// Fetches initial data from KONA CLoud
+			// Data is expected to come ordered by 
+			// _id DESC
 			$.ajax({
 				url: _url,
 				type: 'get',
@@ -167,8 +170,8 @@
 			}
 			// Append one log item and recursively
 			// add the others previous ones
-			$records.prepend('<div class="record">'+formatRecord(jsonArray[0])+'</div>');
-			appendData(jsonArray.slice(1));
+			$records.prepend('<div class="record">'+formatRecord(jsonArray[jsonArray.length-1])+'</div>');
+			appendData(jsonArray.slice(0, jsonArray.length-1));
 		};
 		function formatRecord(record) {
 			// Formats one log item to be appended
@@ -228,7 +231,9 @@
 		function refreshLoop() {
 			// polls for new log data. new data is 
 			// appended at the top of the page. 
-			// active filters are applied
+			// active filters are applied.
+			// data is expected to come ordered by
+			// _id DESC
 			setTimeout(function(){
 				var from = _data[_data.length-1]._id;
 				$.ajax({
