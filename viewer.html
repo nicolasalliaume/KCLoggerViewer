@@ -235,7 +235,7 @@
 			// data is expected to come ordered by
 			// _id DESC
 			setTimeout(function(){
-				var from = _data[_data.length-1]._id;
+				var from = _data[0]._id;
 				$.ajax({
 					url: urlFrom(from),
 					type: 'get',
@@ -245,12 +245,12 @@
 						// top of the DOM
 						appendData(filterChain(_.pairs(_filters), data.data));
 						// appends [all] new data to old data
-						_data = $.merge(_data, data.data);
+						_data = $.merge(data.data, _data);
 						// rebuild filtering options
 						setupExpansion();
 						setupOptions(_data);
 						// set timeout for next refresh
-						setTimeout(refreshLoop, seconds(_refreshDelay));
+						refreshLoop();
 					},
 					error: function(){
 						alert('An unexpected error has occurred');
